@@ -21,13 +21,20 @@ def forward_layers(net, relu_mask, transformers):
     return transformers
 
 
+#FEAT: dtype helper for --dtype float64.
+def _default_float(t):
+    """Float weights in the run's dtype (fp32 weights, or exact fp64 copies under --dtype float64)."""
+    return t.to(torch.get_default_dtype()) if t.is_floating_point() else t
+
+
 def parse_onnx_layers(net):
     input_shape = [dim.dim_value for dim in net.graph.input[0].type.tensor_type.shape.dim]
 
     # Create the new Network object
     layers = Network(input_name=net.graph.input[0].name, input_shape=input_shape, net_format='onnx')
     num_layers = len(net.graph.node)
-    model_name_to_val_dict = {init_vals.name: torch.tensor(numpy_helper.to_array(init_vals)) for init_vals in
+    #FEAT: float weights follow the run's dtype (exact fp64 copies of the fp32 weights under --dtype float64).
+    model_name_to_val_dict = {init_vals.name: _default_float(torch.tensor(numpy_helper.to_array(init_vals))) for init_vals in
                               net.graph.initializer}
 
     for cur_layer in range(num_layers):

@@ -28,6 +28,28 @@ def parse_args():
 
     parser.add_argument('--logs', type=str, default='stdout', help='Logs file')
 
+    # Changes for GPU
+    # Harness mode (experiments/compare_ivan.py): constraintflow-gpu's warmup/repeat protocol
+    parser.add_argument('--warmup', type=int, default=0, help='Untimed runs on the next batches of images (harness mode)')
+    parser.add_argument('--repeat', type=int, default=None,
+                        help='Timed runs on the first batch_size images; setting it selects harness mode')
+    parser.add_argument('--num_images', type=int, default=0,
+                        help='Harness mode: verify this many images, batch_size at a time, one timed run per batch; '
+                             'warmup j uses the images after them. Needs --results_file and --repeat (any value).')
+    parser.add_argument('--results_file', type=str, default=None,
+                        help='With --num_images: one JSON line per warmup and timed batch, written outside the timer')
+    parser.add_argument('--normalization', choices=['ivan', 'cf'], default='ivan',
+                        help="Input normalization: IVAN's own (MNIST mean 0/std 1) or constraintflow-gpu's "
+                             "(MNIST 0.1307/0.3081); CIFAR is the same in both")
+    #FEAT: --dtype float64 runs the analysis in fp64, the precision oracle for bound mismatches.
+    parser.add_argument('--dtype', choices=['float32', 'float64'], default='float32',
+                        help='float64 computes weights, input box and every bound in fp64')
+    #FEAT: --profile_comm records CPU-GPU communication per timed batch (nnverify/comm_profile.py).
+    parser.add_argument('--profile_comm', action='store_true',
+                        help='With --num_images: profile each timed batch with torch.profiler and add syncs, '
+                             'alloc_syncs, gpu_idle_pct and sync_calls to its results line; its time goes to '
+                             'profiled_time_s instead of time_s. Warmups are not profiled.')
+
 
     args = parser.parse_args()
     return args

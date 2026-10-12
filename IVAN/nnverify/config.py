@@ -1,13 +1,31 @@
-from nnverify.specs.input_spec import InputSpecType
+# Changes for GPU
+import os
 
-NET_HOME = "nnverify/nets/"
-DEVICE = 'cpu'
+from nnverify.specs.input_spec import InputSpecType
+from nnverify.common.dataset import Dataset
+
+#FIX FOR: NET_HOME was hardcoded to one machine's /home/db50/cf-harness/nets/ (and run_ivan.py rewrote this file).
+# Defaults to cf-harness/nets next to this checkout; IVAN_NET_HOME overrides it.
+NET_HOME = os.path.join(os.environ.get('IVAN_NET_HOME') or os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', 'nets')), '')
+# Changes for GPU
+# 'cpu' or 'cuda'; run_ivan.py --device sets IVAN_DEVICE
+DEVICE = os.environ.get('IVAN_DEVICE', 'cpu')
+#FEAT: 'float32' or 'float64'; experiments.py --dtype sets IVAN_DTYPE
+DTYPE = os.environ.get('IVAN_DTYPE', 'float32')
+#FEAT: experiments.py --profile_comm sets IVAN_PROFILE_COMM=1
+PROFILE_COMM = os.environ.get('IVAN_PROFILE_COMM', '0') not in ('', '0')
 
 
 class Args:
     def __init__(self, net, domain, count=None, eps=0.01, dataset='mnist', spec_type=InputSpecType.LINF, split=None,
-                 pt_method=None, timeout=None, parallel=False, batch_size=10, initial_split=False, attack=None, run_batch=True):
-        self.net = NET_HOME + net
+                 pt_method=None, timeout=None, parallel=False, batch_size=10, initial_split=False, attack=None, run_batch=True,
+                 # Changes for GPU
+                 warmup=0, repeat=None, normalization='ivan', num_images=0, results_file=None):
+        if dataset == Dataset.MNIST:
+            self.net = NET_HOME + 'mnist/' + net
+        elif dataset == Dataset.CIFAR10:
+            self.net = NET_HOME + 'cifar/' + net
         self.domain = domain
         self.count = count
         self.eps = eps
@@ -21,6 +39,14 @@ class Args:
         self.attack = attack
         self.batch_size = batch_size
         self.run_batch = run_batch
+        # Changes for GPU
+        # Harness mode (Analyzer.run_harness) when repeat is set
+        self.warmup = warmup
+        self.repeat = repeat
+        self.normalization = normalization
+        # Harness mode with num_images: one timed run per batch over the first num_images images
+        self.num_images = num_images
+        self.results_file = results_file
 
 
 log_file = "log.txt"

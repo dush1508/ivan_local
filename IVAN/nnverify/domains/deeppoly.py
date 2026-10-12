@@ -241,6 +241,10 @@ class DeeppolyTransformer:
         #         old_lcof, old_ucof, old_lcst, old_ucst = absmul(*self.get_old_cof_cst(), weight, bias)
         #         self.set_old_cof_cst(old_lcof, old_ucof, old_lcst, old_ucst)
 
+        lb, ub = self.bound()
+
+        #FIX FOR: per-layer debug print forced a GPU sync inside the timed analysis.
+        # print('After linear, lb:', lb.sum(), lb.shape, 'ub:', ub.sum(), ub.shape)
         
         return self
 
@@ -332,8 +336,9 @@ class DeeppolyTransformer:
         first transform it to linear matrix
         then use absmul func
         """
-        weight = layer.weight
-        bias = layer.bias
+        #FIX FOR: conv layers crashed on GPU (weights left on the CPU, multiplied with CUDA tensors).
+        weight = layer.weight.to(self.device)
+        bias = layer.bias.to(self.device)
         num_kernel = weight.shape[0]
 
         k_h, k_w = layer.kernel_size
@@ -355,7 +360,8 @@ class DeeppolyTransformer:
 
         ### pad cof, cst first ###
 
-        cof = torch.eye(size).reshape(size, *(shape)).unsqueeze(0).repeat(self.batch_size, 1, 1, 1, 1)
+        #FIX FOR: conv layers crashed on GPU (identity built on the CPU, then multiplied with CUDA tensors).
+        cof = torch.eye(size, device=self.device).reshape(size, *(shape)).unsqueeze(0).repeat(self.batch_size, 1, 1, 1, 1)
 
         pad2d = (p_w, p_w, p_h, p_h)
         cof = F.pad(cof, pad2d)
@@ -382,6 +388,13 @@ class DeeppolyTransformer:
         new_cst = bias.view(-1, 1, 1).expand(num_kernel, output_h, output_w).reshape(1, -1)
 
         self.set_cof_cst(new_cof, new_cof, new_cst, new_cst)
+
+        lb, ub = self.bound()
+
+        #FIX FOR: per-layer debug print forced a GPU sync inside the timed analysis.
+        # print('After conv, lb:', lb.sum(), 'ub:', ub.sum())
+
+
         return self
 
     # def handle_relu(self, layer, optimize=True, relu_mask=None):
@@ -471,6 +484,10 @@ class DeeppolyTransformer:
         size = self.size
 
         lb, ub = self.bound()
+
+        #FIX FOR: per-layer debug print forced a GPU sync inside the timed analysis.
+        # print('Before relu, lb:', lb.sum(), 'ub:', ub.sum())
+
         self.unstable_relus.append(torch.where(torch.logical_and(ub >= 0, lb <= 0)))
 
         new_lcof = torch.zeros((self.batch_size, size)).to(self.device)
@@ -541,7 +558,10 @@ class DeeppolyTransformer:
 
         self.set_cof_cst(torch.diag_embed(new_lcof), torch.diag_embed(new_ucof), new_lcst.reshape(self.batch_size, -1),
                                  new_ucst.reshape(self.batch_size, -1))
-        
+        lb, ub = self.bound()
+
+        #FIX FOR: per-layer debug print forced a GPU sync inside the timed analysis.
+        # print('After relu, lb:', lb.sum(), lb.shape, 'ub:', ub.sum(), ub.shape)
         return self
 
     # def handle_flatten(self, layer):

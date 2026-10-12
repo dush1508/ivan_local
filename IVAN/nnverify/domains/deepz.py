@@ -6,8 +6,8 @@ from torch.nn import functional as F
 import nnverify.attack
 from nnverify import util
 from nnverify.domains import grb_utils
-
-device = 'cpu'
+# Changes for GPU
+from nnverify import config
 
 
 class ZonoTransformer:
@@ -36,8 +36,9 @@ class ZonoTransformer:
             self.size = 3072
 
         
-        self.ilb = self.ilb.to(device)
-        self.iub = self.iub.to(device)
+        # Changes for GPU
+        self.ilb = self.ilb.to(config.DEVICE)
+        self.iub = self.iub.to(config.DEVICE)
 
 
         center = (self.ilb + self.iub) / 2
@@ -45,7 +46,8 @@ class ZonoTransformer:
         noise_ind = self.get_noise_indices()
 
         temp1 = ((self.iub - self.ilb) / 2).unsqueeze(-1).repeat(1, 1, self.size)
-        temp2 = torch.eye(self.size).unsqueeze(0).repeat(self.batch_size, 1, 1)
+        # Changes for GPU
+        temp2 = torch.eye(self.size, device=config.DEVICE).unsqueeze(0).repeat(self.batch_size, 1, 1)
         cof = (temp1 * temp2)
 
         self.centers = []
@@ -61,7 +63,8 @@ class ZonoTransformer:
         noise_ind = torch.where(self.iub > (self.ilb + num_eps))
         if noise_ind[0].size() == 0:
             # add one dummy index in case there is no perturbation
-            noise_ind = torch.tensor([0]).to(device)
+            # Changes for GPU
+            noise_ind = torch.tensor([0]).to(config.DEVICE)
         return noise_ind
 
     def compute_lb(self, adv_label=None, complete=False):
@@ -317,7 +320,8 @@ class ZonoTransformer:
         passive_relus = (ub <= 0)
         ambiguous_relus = (~active_relus) & (~passive_relus)
 
-        mult_fact = torch.ones(size, dtype=torch.bool)
+        # Changes for GPU
+        mult_fact = torch.ones(size, dtype=torch.bool, device=config.DEVICE)
         # mult_fact should have 1 at active relus, 0 at passive relus and lambda at ambiguous_relus
         mult_fact = mult_fact * (active_relus + ambiguous_relus * lmbda)
 
@@ -325,7 +329,8 @@ class ZonoTransformer:
         non_empty_mask = new_noise_cofs.abs().sum(dim=0).sum(dim=1).bool()
         new_noise_cofs = new_noise_cofs[:, non_empty_mask, :]
 
-        print(mult_fact.shape, prev_cof.shape)
+        # Changes for GPU
+        # print(mult_fact.shape, prev_cof.shape)
 
         block_1 = mult_fact.unsqueeze(1) * prev_cof
         block_2 = new_noise_cofs

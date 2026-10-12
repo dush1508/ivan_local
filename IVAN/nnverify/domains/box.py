@@ -12,6 +12,9 @@ class BoxTransformer:
         self.lbs = [prop.input_lb]
         self.ubs = [prop.input_ub]
 
+        # print("input_lb: ", prop.input_lb.shape, prop.input_lb.sum())
+        # djfbjfb
+
         self.prop = prop
 
 
@@ -48,6 +51,11 @@ class BoxTransformer:
     def set_bound(self, lb, ub):
         self.lbs.append(lb)
         self.ubs.append(ub)
+        # Changes for GPU
+        # Debug output; lb.sum() forces a GPU sync on every layer
+        # print(lb.sum())
+        # print(lb.shape)
+        # print()
     
     def get_all_bounds(self):
         return self.lbs, self.ubs
@@ -164,8 +172,9 @@ class BoxTransformer:
         layer_no = len(self.unstable_relus)
         self.unstable_relus.append(torch.where(torch.logical_and(ub >= 0, lb <= 0))[0].tolist())
 
-        c1_decision = torch.zeros(size, dtype=torch.bool)
-        c2_decision = torch.zeros(size, dtype=torch.bool)
+        # Changes for GPU
+        c1_decision = torch.zeros(size, dtype=torch.bool, device=lb.device)
+        c2_decision = torch.zeros(size, dtype=torch.bool, device=lb.device)
 
         if relu_mask is not None:
             for relu in relu_mask.keys():

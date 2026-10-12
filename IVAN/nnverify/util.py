@@ -148,10 +148,16 @@ def prepare_data(dataset, train=False, batch_size=100, normalize=False):
     return testloader
 
 
-def get_mean_std(dataset):
-    if dataset == Dataset.MNIST:
+# Changes for GPU
+def get_mean_std(dataset, normalization='ivan'):
+    if dataset == Dataset.MNIST and normalization == 'cf':
+        # constraintflow-gpu's (and the harness's auto_LiRPA's) MNIST normalization
         means = [0.1307]
         stds = [0.3081]
+    elif dataset == Dataset.MNIST:
+        # ONNX networks (ERAN benchmark) expect raw [0,1] inputs — no normalization
+        means = [0.0]
+        stds = [1.0]
     elif dataset == Dataset.CIFAR10 or dataset == Dataset.OVAL_CIFAR:
         # For the model that is loaded from cert def this normalization was
         # used
@@ -207,6 +213,14 @@ def get_net(net_name, dataset):
         raise ValueError("Unsupported net format!")
 
     net.net_name = net_name
+
+    # Changes for GPU
+    from nnverify import config
+    for layer in net:
+        if isinstance(layer.weight, torch.Tensor):
+            layer.weight = layer.weight.to(config.DEVICE)
+        if isinstance(layer.bias, torch.Tensor):
+            layer.bias = layer.bias.to(config.DEVICE)
     return net
 
 

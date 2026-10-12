@@ -429,8 +429,8 @@ class PolyzTransformer:
         output_h = int((input_h + 2 * p_h - k_h) / s_h + 1)
         output_w = int((input_w + 2 * p_w - k_w) / s_w + 1)
 
-        self.shape = (num_kernel, output_h, output_w)
-        self.size = num_kernel * output_h * output_w
+        # self.shape = (num_kernel, output_h, output_w)
+        # self.size = num_kernel * output_h * output_w
 
         prev_cent, prev_cof = self.get_zono()
         num_eps = prev_cof.shape[1]
@@ -453,6 +453,7 @@ class PolyzTransformer:
         weight = layer.weight
         bias = layer.bias
         num_kernel = weight.shape[0]
+
 
         k_h, k_w = layer.kernel_size
         s_h, s_w = layer.stride

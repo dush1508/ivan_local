@@ -232,11 +232,13 @@ def get_output_spec_weight_and_bias(X, y):
     I = (~(y.unsqueeze(1) == torch.arange(num_classes).type_as(y).unsqueeze(0)))
     weight = (weight[I].view(X.size(0), num_classes - 1, num_classes))
     weight = weight.permute(0, 2, 1)
-    bias = torch.zeros(9, dtype=torch.float32)
+    #FEAT: follow the run's dtype (--dtype float64) instead of hardcoded fp32.
+    bias = torch.zeros(9, dtype=torch.get_default_dtype())
     return weight.T, bias
 
 
-def get_linf_spec(inputs, labels, eps, dataset, run_batch, net):
+# Changes for GPU
+def get_linf_spec(inputs, labels, eps, dataset, run_batch, net, normalization='ivan'):
     if run_batch:
         properties = []
 
@@ -250,7 +252,8 @@ def get_linf_spec(inputs, labels, eps, dataset, run_batch, net):
         iub = torch.clip(image + eps, min=0., max=1.)
 
 
-        mean, std = util.get_mean_std(dataset)
+        # Changes for GPU
+        mean, std = util.get_mean_std(dataset, normalization)
 
         ilb = (ilb - mean) / std
         iub = (iub - mean) / std
@@ -258,12 +261,26 @@ def get_linf_spec(inputs, labels, eps, dataset, run_batch, net):
         ilb = ilb.reshape(ilb.shape[0], -1)
         iub = iub.reshape(iub.shape[0], -1)
 
+        # Changes for GPU
+        from nnverify import config
+        ilb, iub, image = ilb.to(config.DEVICE), iub.to(config.DEVICE), image.to(config.DEVICE)
+
+        # print(image.shape)
+        # print(image.sum())
+
+        # print(mean)
+        # print(std)
+
+        # print(ilb.shape)
+        # print(ilb.sum())
+        # fhk
 
         out_constr = Constraint(OutSpecType.LOCAL_ROBUST, label=labels)
         properties.append(Property(ilb, iub, InputSpecType.LINF, out_constr, dataset, input=image))
 
         spec_weight, spec_bias = get_output_spec_weight_and_bias(inputs, labels)
-        layer = Layer(weight=spec_weight, bias=spec_bias, type=LayerType.Linear)
+        # Changes for GPU
+        layer = Layer(weight=spec_weight.to(config.DEVICE), bias=spec_bias.to(config.DEVICE), type=LayerType.Linear)
 
         net.append(layer)
 

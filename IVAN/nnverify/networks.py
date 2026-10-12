@@ -9,8 +9,9 @@ class Normalization(nn.Module):
 
     def __init__(self, device):
         super(Normalization, self).__init__()
-        self.mean = torch.FloatTensor([0.1307]).view((1, 1, 1, 1)).to(device)
-        self.sigma = torch.FloatTensor([0.3081]).view((1, 1, 1, 1)).to(device)
+        #FEAT: follow the run's dtype (--dtype float64) instead of hardcoded fp32.
+        self.mean = torch.tensor([0.1307]).view((1, 1, 1, 1)).to(device)
+        self.sigma = torch.tensor([0.3081]).view((1, 1, 1, 1)).to(device)
 
     def forward(self, x):
         return (x - self.mean) / self.sigma

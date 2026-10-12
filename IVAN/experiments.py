@@ -2,7 +2,11 @@ from nnverify.common.dataset import Dataset
 from nnverify.common import Domain
 from parse_args import parse_args
 
+#FEAT: os.environ carries --dtype to the analysis subprocess as IVAN_DTYPE.
+import os
 import subprocess
+# Changes for GPU
+import sys
 
 
 
@@ -36,7 +40,10 @@ import nnverify.config as config
 
 class NewTest(TestCase):
     def new_test(self):
-        args = config.Args(net="{network}", domain={program}, dataset={dataset}, eps={args.eps}, count={args.batch_size}, run_batch=True)
+        # Changes for GPU
+        args = config.Args(net="{network}", domain={program}, dataset={dataset}, eps={args.eps}, count={args.batch_size}, run_batch=True,
+                           warmup={args.warmup}, repeat={args.repeat}, normalization="{args.normalization}",
+                           num_images={args.num_images}, results_file={args.results_file!r})
         Analyzer(args).run_analyzer()
 '''
 
@@ -53,11 +60,19 @@ def run_test():
     print(f'Epsilon: {args.eps}')
     print(f'Dataset: {args.dataset}')
     print()
-    cmd = 'python3 -m unittest -v nnverify.tests.experiment.NewTest.new_test'
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    # Changes for GPU
+    # Use the interpreter running this script, not whatever python3 is first on PATH
+    cmd = [sys.executable, '-m', 'unittest', '-v', 'nnverify.tests.experiment.NewTest.new_test']
+    #FEAT: the analysis runs in this subprocess, so --dtype reaches it as IVAN_DTYPE (read by nnverify/config.py).
+    #FEAT: --profile_comm reaches it the same way, as IVAN_PROFILE_COMM.
+    result = subprocess.run(cmd, capture_output=True, text=True,
+                            env=dict(os.environ, IVAN_DTYPE=args.dtype, IVAN_PROFILE_COMM=str(int(args.profile_comm))))
     print(result.stdout)
-    # print(result.stderr)
+    print(result.stderr)
+    # Changes for GPU
+    return result.returncode
 
 args = parse_args()
 create_test(args)
-run_test()
+# Changes for GPU
+sys.exit(run_test())
