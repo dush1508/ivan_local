@@ -44,6 +44,14 @@ def parse_args():
     #FEAT: --dtype float64 runs the analysis in fp64, the precision oracle for bound mismatches.
     parser.add_argument('--dtype', choices=['float32', 'float64'], default='float32',
                         help='float64 computes weights, input box and every bound in fp64')
+    #FEAT: per-batch time limit.
+    parser.add_argument('--batch_timeout', type=float, default=0.0,
+                        help="With --num_images: end the process if one timed batch runs longer than this many "
+                             "seconds (faulthandler prints 'Timeout' and every thread's stack). Warmups: --warmup_timeout. 0: no limit.")
+    #FEAT: per-warmup time limit.
+    parser.add_argument('--warmup_timeout', type=float, default=0.0,
+                        help="With --num_images: end the process if one warmup run takes longer than this many "
+                             "seconds (faulthandler prints 'Timeout' and every thread's stack). 0: no limit.")
     #FEAT: --profile_comm records CPU-GPU communication per timed batch (nnverify/comm_profile.py).
     parser.add_argument('--profile_comm', action='store_true',
                         help='With --num_images: profile each timed batch with torch.profiler and add syncs, '

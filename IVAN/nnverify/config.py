@@ -15,17 +15,28 @@ DEVICE = os.environ.get('IVAN_DEVICE', 'cpu')
 DTYPE = os.environ.get('IVAN_DTYPE', 'float32')
 #FEAT: experiments.py --profile_comm sets IVAN_PROFILE_COMM=1
 PROFILE_COMM = os.environ.get('IVAN_PROFILE_COMM', '0') not in ('', '0')
+#FEAT: experiments.py --batch_timeout sets IVAN_BATCH_TIMEOUT (seconds per timed batch; 0 = no limit)
+BATCH_TIMEOUT = float(os.environ.get('IVAN_BATCH_TIMEOUT', '0') or 0)
+#FEAT: experiments.py --warmup_timeout sets IVAN_WARMUP_TIMEOUT (seconds per warmup run; 0 = no limit)
+WARMUP_TIMEOUT = float(os.environ.get('IVAN_WARMUP_TIMEOUT', '0') or 0)
 
 
 class Args:
     def __init__(self, net, domain, count=None, eps=0.01, dataset='mnist', spec_type=InputSpecType.LINF, split=None,
                  pt_method=None, timeout=None, parallel=False, batch_size=10, initial_split=False, attack=None, run_batch=True,
                  # Changes for GPU
-                 warmup=0, repeat=None, normalization='ivan', num_images=0, results_file=None):
+                 warmup=0, repeat=None, normalization='ivan', num_images=0, results_file=None, vnnlib=None):
         if dataset == Dataset.MNIST:
             self.net = NET_HOME + 'mnist/' + net
         elif dataset == Dataset.CIFAR10:
             self.net = NET_HOME + 'cifar/' + net
+        #FEAT: CIFAR-100 nets live in nets/cifar100/; a VNN-COMP benchmark's in onnx/ next to its stacked specs.
+        elif dataset == Dataset.CIFAR100:
+            self.net = NET_HOME + 'cifar100/' + net
+        elif dataset == Dataset.VNNLIB:
+            #FEAT: --dataset vnnlib:<benchmark folder> (the harness's spec files, no longer a stacked .npz).
+            self.net = os.path.join(vnnlib, 'onnx', net)
+        self.vnnlib = vnnlib
         self.domain = domain
         self.count = count
         self.eps = eps

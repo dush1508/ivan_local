@@ -1,5 +1,6 @@
 # Changes for GPU
 import contextlib
+import faulthandler
 import gc
 import io
 import os
@@ -14,6 +15,8 @@ import time
 import nnverify.bnb.bnb as bnb
 
 from nnverify import config
+import numpy as np
+from nnverify.common.dataset import Dataset  #FEAT: VNN-LIB boxes in harness mode
 from nnverify.common import Status
 from nnverify.specs.out_spec import OutSpecType
 from nnverify.common.result import Result, Results
@@ -171,13 +174,21 @@ class Analyzer:
         print(f'dtype: {torch.get_default_dtype()}')
 
         num_images = getattr(args, 'num_images', 0)
-        inputs, labels = next(iter(util.prepare_data(
-            args.dataset, batch_size=num_images + warmup * bs if num_images else bs * (warmup + 1))))
+        #FEAT: VNN-COMP specs: the harness's stacked boxes (already normalized); the network is parsed per run below.
+        if args.dataset == Dataset.VNNLIB:
+            #FEAT: placeholders: run_once below refuses VNN-LIB specs before using them.
+            n = num_images + warmup * bs if num_images else bs * (warmup + 1)
+            inputs, labels = torch.zeros(n, 1), torch.zeros(n, dtype=torch.long)
+        else:
+            inputs, labels = next(iter(util.prepare_data(
+                args.dataset, batch_size=num_images + warmup * bs if num_images else bs * (warmup + 1))))
         #FEAT: ToTensor() yields fp32 images; follow the run's dtype so the input box is built in it.
         inputs = inputs.to(torch.get_default_dtype())
 
         def run_once(offset):
             net = util.get_net(args.net, args.dataset)
+            if args.dataset == Dataset.VNNLIB:
+                raise NotImplementedError('VNN-LIB boxes and margin rows are not implemented in IVAN\'s harness mode')
             props, net = specs.get_linf_spec(inputs[offset:offset + bs], labels[offset:offset + bs], args.eps,
                                              args.dataset, True, net, normalization=args.normalization)
             transformer = get_domain_transformer(args, net, props[0].get_input_clause(0), complete=False)
@@ -255,10 +266,13 @@ class Analyzer:
         with open(self.args.results_file, 'w') as out:
             for j in range(warmup):
                 lo = num_images + j * bs
+                if config.WARMUP_TIMEOUT:
+                    faulthandler.dump_traceback_later(config.WARMUP_TIMEOUT, exit=True)
                 start = time.perf_counter()
                 run_once(lo)
                 sync()
                 warmup_time = time.perf_counter() - start
+                faulthandler.cancel_dump_traceback_later()
                 print(f'Warmup run {j + 1}/{warmup}: {warmup_time:.6f} s', flush=True)
                 write(out, {'kind': 'warmup', 'index': j, 'images': [lo, lo + bs], 'time_s': warmup_time})
                 gc.collect()
@@ -279,11 +293,14 @@ class Analyzer:
                     if is_cuda:
                         torch.cuda.reset_peak_memory_stats()
                         resident = torch.cuda.memory_allocated()
+                    if config.BATCH_TIMEOUT:
+                        faulthandler.dump_traceback_later(config.BATCH_TIMEOUT, exit=True)
                     start = time.perf_counter()
                     with comm.region():
                         lb, ub = run_once(lo)
                         sync()
                     run_time = time.perf_counter() - start
+                    faulthandler.cancel_dump_traceback_later()
                 # Per-run peaks exist only on the GPU; a CPU process's peak RSS is lifetime-wide.
                 peak = torch.cuda.max_memory_allocated() if is_cuda else None
                 write(out, {'kind': 'batch', 'batch': i, 'images': [lo, lo + bs], comm.time_key: run_time,

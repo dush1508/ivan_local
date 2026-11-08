@@ -99,7 +99,7 @@ def reshape_input(x, dataset):
     """
     if dataset == Dataset.MNIST:
         x = x.reshape(-1, 1, 28, 28)
-    elif dataset == Dataset.CIFAR10:
+    elif dataset in (Dataset.CIFAR10, Dataset.CIFAR100):
         x = x.reshape(-1, 3, 32, 32)
     elif dataset == Dataset.ACAS:
         # Making it 2-D to avoid ONNX:MatMul (instead of ONNX:GEMM) translation used in AutoLirpa
@@ -140,6 +140,9 @@ def prepare_data(dataset, train=False, batch_size=100, normalize=False):
         test_set = torchvision.datasets.CIFAR10(root='./data', train=train, download=True, transform=tr)
     elif dataset == Dataset.MNIST:
         test_set = torchvision.datasets.MNIST(root='./data', train=train, download=True, transform=tr)
+    #FEAT: CIFAR-100 test set, as cf-gpu and auto_LiRPA load it.
+    elif dataset == Dataset.CIFAR100:
+        test_set = torchvision.datasets.CIFAR100(root='./data', train=train, download=True, transform=tr)
     else:
         raise ValueError("Unsupported Dataset")
 
@@ -158,6 +161,10 @@ def get_mean_std(dataset, normalization='ivan'):
         # ONNX networks (ERAN benchmark) expect raw [0,1] inputs — no normalization
         means = [0.0]
         stds = [1.0]
+    #FEAT: constraintflow-gpu's CIFAR-100 normalization.
+    elif dataset == Dataset.CIFAR100:
+        means = [0.5071, 0.4865, 0.4409]
+        stds = [0.2673, 0.2564, 0.2761]
     elif dataset == Dataset.CIFAR10 or dataset == Dataset.OVAL_CIFAR:
         # For the model that is loaded from cert def this normalization was
         # used

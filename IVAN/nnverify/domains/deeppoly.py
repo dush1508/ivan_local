@@ -4,6 +4,7 @@ import time
 from torch.nn import functional as F
 import torch.optim as optim
 from torch.optim.lr_scheduler import MultiStepLR
+from nnverify import config
 
 
 class DeeppolyTransformer:
@@ -19,7 +20,8 @@ class DeeppolyTransformer:
         while fixing the lb, and ub after normalization.
         """
         #self.device = device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.device = 'cpu'
+        #FIX FOR: DeepPoly was hardcoded to the CPU, so GPU sweeps ran its back-substitution on the CPU.
+        self.device = config.DEVICE
 
         self.prop = prop
         self.size = prop.get_input_size()
@@ -241,7 +243,8 @@ class DeeppolyTransformer:
         #         old_lcof, old_ucof, old_lcst, old_ucst = absmul(*self.get_old_cof_cst(), weight, bias)
         #         self.set_old_cof_cst(old_lcof, old_ucof, old_lcst, old_ucst)
 
-        lb, ub = self.bound()
+        #FIX FOR: back-substitution whose bounds were only used by the (removed) debug print.
+        # lb, ub = self.bound()
 
         #FIX FOR: per-layer debug print forced a GPU sync inside the timed analysis.
         # print('After linear, lb:', lb.sum(), lb.shape, 'ub:', ub.sum(), ub.shape)
@@ -389,7 +392,8 @@ class DeeppolyTransformer:
 
         self.set_cof_cst(new_cof, new_cof, new_cst, new_cst)
 
-        lb, ub = self.bound()
+        #FIX FOR: back-substitution whose bounds were only used by the (removed) debug print.
+        # lb, ub = self.bound()
 
         #FIX FOR: per-layer debug print forced a GPU sync inside the timed analysis.
         # print('After conv, lb:', lb.sum(), 'ub:', ub.sum())
@@ -558,7 +562,8 @@ class DeeppolyTransformer:
 
         self.set_cof_cst(torch.diag_embed(new_lcof), torch.diag_embed(new_ucof), new_lcst.reshape(self.batch_size, -1),
                                  new_ucst.reshape(self.batch_size, -1))
-        lb, ub = self.bound()
+        #FIX FOR: back-substitution whose bounds were only used by the (removed) debug print.
+        # lb, ub = self.bound()
 
         #FIX FOR: per-layer debug print forced a GPU sync inside the timed analysis.
         # print('After relu, lb:', lb.sum(), lb.shape, 'ub:', ub.sum(), ub.shape)

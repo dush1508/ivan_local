@@ -225,15 +225,15 @@ def get_acas_props(count):
         props.append(get_acas_spec(i))
     return props
 
-def get_output_spec_weight_and_bias(X, y):
-    num_classes = 10
+#FIX FOR: the margin rows assumed 10 classes, so a CIFAR-100 net got a wrong output spec.
+def get_output_spec_weight_and_bias(X, y, num_classes=10):
     weight = (torch.eye(num_classes).type_as(X)[y].unsqueeze(1)
         - torch.eye(num_classes).type_as(X).unsqueeze(0))
     I = (~(y.unsqueeze(1) == torch.arange(num_classes).type_as(y).unsqueeze(0)))
     weight = (weight[I].view(X.size(0), num_classes - 1, num_classes))
     weight = weight.permute(0, 2, 1)
     #FEAT: follow the run's dtype (--dtype float64) instead of hardcoded fp32.
-    bias = torch.zeros(9, dtype=torch.get_default_dtype())
+    bias = torch.zeros(num_classes - 1, dtype=torch.get_default_dtype())
     return weight.T, bias
 
 
@@ -278,7 +278,7 @@ def get_linf_spec(inputs, labels, eps, dataset, run_batch, net, normalization='i
         out_constr = Constraint(OutSpecType.LOCAL_ROBUST, label=labels)
         properties.append(Property(ilb, iub, InputSpecType.LINF, out_constr, dataset, input=image))
 
-        spec_weight, spec_bias = get_output_spec_weight_and_bias(inputs, labels)
+        spec_weight, spec_bias = get_output_spec_weight_and_bias(inputs, labels, 100 if dataset == Dataset.CIFAR100 else 10)
         # Changes for GPU
         layer = Layer(weight=spec_weight.to(config.DEVICE), bias=spec_bias.to(config.DEVICE), type=LayerType.Linear)
 

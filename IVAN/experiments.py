@@ -27,8 +27,14 @@ def create_test(args):
         dataset = Dataset.MNIST
     elif args.dataset == 'cifar10':
         dataset = Dataset.CIFAR10
+    #FEAT: the cf-harness's CIFAR-100 configs and VNN-COMP specs (--dataset vnnlib:<benchmark folder>).
+    elif args.dataset == 'cifar100':
+        dataset = Dataset.CIFAR100
+    elif args.dataset.startswith('vnnlib:'):
+        dataset = Dataset.VNNLIB
     else:
-        raise ValueError("Invalid dataset name. Choose from 'mnist' or 'cifar10'.")
+        raise ValueError("Invalid dataset name. Choose from 'mnist', 'cifar10', 'cifar100' or 'vnnlib:<benchmark folder>'.")
+    vnnlib = args.dataset[len('vnnlib:'):] if dataset == Dataset.VNNLIB else None
     
     network = args.network+'.onnx'
     res = f'''
@@ -43,7 +49,7 @@ class NewTest(TestCase):
         # Changes for GPU
         args = config.Args(net="{network}", domain={program}, dataset={dataset}, eps={args.eps}, count={args.batch_size}, run_batch=True,
                            warmup={args.warmup}, repeat={args.repeat}, normalization="{args.normalization}",
-                           num_images={args.num_images}, results_file={args.results_file!r})
+                           num_images={args.num_images}, results_file={args.results_file!r}, vnnlib={vnnlib!r})
         Analyzer(args).run_analyzer()
 '''
 
@@ -66,7 +72,9 @@ def run_test():
     #FEAT: the analysis runs in this subprocess, so --dtype reaches it as IVAN_DTYPE (read by nnverify/config.py).
     #FEAT: --profile_comm reaches it the same way, as IVAN_PROFILE_COMM.
     result = subprocess.run(cmd, capture_output=True, text=True,
-                            env=dict(os.environ, IVAN_DTYPE=args.dtype, IVAN_PROFILE_COMM=str(int(args.profile_comm))))
+                            env=dict(os.environ, IVAN_DTYPE=args.dtype, IVAN_PROFILE_COMM=str(int(args.profile_comm)),
+                                     IVAN_BATCH_TIMEOUT=str(args.batch_timeout),
+                                     IVAN_WARMUP_TIMEOUT=str(args.warmup_timeout)))
     print(result.stdout)
     print(result.stderr)
     # Changes for GPU
